@@ -31,7 +31,7 @@ executable pkgdbgc
                      , containers
                      , pretty
                      , fgl
-                     , cabal-plan >= 0.2.0.0
+                     , cabal-plan >= 0.3.0.0
                      , aeson
                      , yaml
                      , text

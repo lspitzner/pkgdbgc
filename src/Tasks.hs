@@ -336,9 +336,7 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
   putStrTable "count of entries reachable from roots"
               (show $ length $ G.dfs rootNodes pkgGraph)
   let restGraph = G.delNodes rootNodes pkgGraph
-  let toBeDropped = fmap (Maybe.fromJust . G.lab restGraph) $ G.bfsn
-        [ n | n <- G.nodes restGraph, G.indeg restGraph n == 0 ]
-        restGraph
+  let toBeDropped = G.topsort' restGraph
   when (G.order restGraph /= length toBeDropped) $ do
     putStrErrLn "internal error: restGraph size /= toBeDropped length"
     System.Exit.exitFailure
@@ -353,7 +351,7 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
     else do
       toBeDropped `forM_` \uid -> do
         let uidStr = show $ disp $ installedUnitId uid
-        let args   = ["--package-db", pkgdir, "unregister", uidStr]
+        let args   = ["--package-db", pkgdir, "unregister", "--ipid", uidStr]
         when verbose $ do
           putStrErrLn $ "executing `" ++ ghcpkg ++ " " ++ unwords args ++ "`"
         (exitCode, stdout, stderr) <- System.Process.readProcessWithExitCode
