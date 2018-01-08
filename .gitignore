@@ -1,0 +1,12 @@
+*.prof
+*.aux
+*.eventlog
+*.hp
+*.ps
+/*.pdf
+dist/
+dist-newstyle/
+local/
+.cabal-sandbox/
+.stack-work/
+cabal.sandbox.config
