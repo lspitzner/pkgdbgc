@@ -45,7 +45,7 @@ getPkgInfosOrExit _ = do
   putStrErrLn "Requires exactly one --package-db to inspect"
   System.Exit.exitFailure
 
-getPlansFromFiles :: [FilePath] -> IO [Cabal.Plan.PlanJson]
+getPlansFromFiles :: [FilePath] -> IO [(FilePath, Cabal.Plan.PlanJson)]
 getPlansFromFiles planFiles = do
   planDirs <- fmap (>>= lines) $ mapM readFile planFiles
   fmap join $ planDirs `forM` \plan -> do
@@ -53,13 +53,13 @@ getPlansFromFiles planFiles = do
       Left (err :: SomeException) -> do
         putStrErrLn $ "warning: could not parse " ++ plan ++ ": " ++ show err
         pure []
-      Right x -> pure [x]
+      Right x -> pure [(plan, x)]
 
-getPlanFromFile :: FilePath -> IO Cabal.Plan.PlanJson
-getPlanFromFile planFile = do
+getPlanFromFileOrExit :: FilePath -> IO Cabal.Plan.PlanJson
+getPlanFromFileOrExit planFile = do
   try (Cabal.Plan.decodePlanJson planFile) >>= \case
     Left (err :: SomeException) -> do
-      putStrErrLn $ "warning: could not parse " ++ planFile ++ ": " ++ show err
+      putStrErrLn $ "error: could not parse " ++ planFile ++ ": " ++ show err
       System.Exit.exitFailure
     Right x -> pure x
 

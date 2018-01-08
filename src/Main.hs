@@ -46,16 +46,16 @@ mainCmdParser helpDesc = do
   addCmdSynopsis "garbage collection for ghc-pkg databases"
   -- addCmdHelp $ helpDoc
   reorderStart
-  _printHelp   <- addSimpleBoolFlag "h" ["help"] mempty
-  printVersion <- addSimpleBoolFlag "" ["version"] mempty
-  dbPathL      <- addFlagStringParams [] ["package-db"] "DBPATH" mempty
-  plansFileL   <- addFlagStringParams [] ["plans-file"] "PLANSFILE" mempty
-  rootsFileL   <- addFlagStringParams [] ["roots-file"] "ROOTSFILE" mempty
-  compilerL    <- addFlagStringParams [] ["compiler"] "COMPILER" mempty
-  storepathL   <- addFlagStringParams [] ["store-path"] "STOREPATH" mempty
-  ghcpkgL      <- addFlagStringParams [] ["with-ghc-pkg"] "GHCPKG" mempty
-  dryGlob      <- addSimpleBoolFlag [] ["dryrun", "dry-run"] mempty
-  verboseGlob  <- addSimpleBoolFlag "v" ["verbose"] mempty
+  _printHelp    <- addSimpleBoolFlag "h" ["help"] mempty
+  printVersion  <- addSimpleBoolFlag "" ["version"] mempty
+  dbPathL       <- addFlagStringParams [] ["package-db"] "DBPATH" mempty
+  plansFileL    <- addFlagStringParams [] ["plans-file"] "PLANSFILE" mempty
+  rootsFileL    <- addFlagStringParams [] ["roots-file"] "ROOTSFILE" mempty
+  compilerL     <- addFlagStringParams [] ["compiler"] "COMPILER" mempty
+  storepathL    <- addFlagStringParams [] ["store-path"] "STOREPATH" mempty
+  ghcpkgL       <- addFlagStringParams [] ["with-ghc-pkg"] "GHCPKG" mempty
+  dryGlobal     <- addSimpleBoolFlag [] ["dryrun", "dry-run"] mempty
+  verboseGlobal <- addSimpleBoolFlag "v" ["verbose"] mempty
   reorderStop
   addHelpCommand' helpDesc
   addCmdImpl $ void $ do
@@ -77,6 +77,9 @@ mainCmdParser helpDesc = do
   addCmd "plan-coverage" $ addCmdImpl $ planCoverageTask dbPathL plansFileL
   addCmd "roots-coverage" $ addCmdImpl $ rootsCoverageTask dbPathL rootsFileL
   addCmd "registry-coverage" $ addCmdImpl $ registryCoverageTask dbPathL
+  addCmd "registry-recheck-plans" $ do
+    verbose <- addSimpleBoolFlag "v" ["verbose"] mempty
+    addCmdImpl $ registryRecheckPlansTask (verboseGlobal || verbose)
   addCmd "register-dist-newstyle" $ do
     distNewstylePathM <- addParamStringOpt "DISTNEWPATH" mempty
     addCmdImpl $ registerTask distNewstylePathM
@@ -89,6 +92,6 @@ mainCmdParser helpDesc = do
                              ghcpkgL
                              compilerL
                              dbPathL
-                             (dryGlob || dry)
-                             (verboseGlob || verbose)
+                             (dryGlobal || dry)
+                             (verboseGlobal || verbose)
 

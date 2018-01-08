@@ -108,9 +108,10 @@ dbGraphTask dbPathL = do
 planInfoTask :: [FilePath] -> IO ()
 planInfoTask plansFileL = do
   plans <- getPlansFromFiles plansFileL
-  putStrLn $ printf "got %d plans referencing %d unit ids"
-                    (length plans)
-                    (length $ plans >>= (Cabal.Plan.pjUnits .> Map.keys))
+  putStrLn $ printf
+    "got %d plans referencing %d unit ids"
+    (length plans)
+    (length $ plans >>= (snd .> Cabal.Plan.pjUnits .> Map.keys))
 
 
 planListTask :: [FilePath] -> IO ()
@@ -119,8 +120,8 @@ planListTask plansFileL = do
   mapM_
     putStrLn
     [ show $ disp $ id @Cabal.UnitId $ read $ show unit
-    | plan <- plans
-    , unit <- Map.keys (Cabal.Plan.pjUnits plan)
+    | (_, plan) <- plans
+    , unit      <- Map.keys (Cabal.Plan.pjUnits plan)
     ]
 
 
@@ -128,7 +129,7 @@ planRootsTask :: [FilePath] -> [FilePath] -> IO ()
 planRootsTask dbPathL plansFileL = do
   infos <- getPkgInfosOrExit dbPathL
   plans <- getPlansFromFiles plansFileL
-  let planUnits = extractPlansUnits plans
+  let planUnits = extractPlansUnits $ map snd plans
   let (pkgGraph :: G.Gr InstalledPackageInfo (), unitMap) =
         createPkgGraph infos
   let planNodes =
@@ -147,7 +148,7 @@ planCoverageTask :: [FilePath] -> [FilePath] -> IO ()
 planCoverageTask dbPathL plansFileL = do
   infos <- getPkgInfosOrExit dbPathL
   plans <- getPlansFromFiles plansFileL
-  let units = extractPlansUnits plans
+  let units = extractPlansUnits $ map snd plans
   let (pkgGraph :: G.Gr InstalledPackageInfo (), unitMap) =
         createPkgGraph infos
   let planNodes = [ n | unit <- units, Just n <- [Map.lookup unit unitMap] ]
@@ -209,18 +210,11 @@ registerTask distNewstylePathM = do
   unless exists $ do
     putStrErrLn $ "could not find plan.json"
     System.Exit.exitFailure
-  planJson <- getPlanFromFile planFilePath
+  planJson <- getPlanFromFileOrExit planFilePath
   let compilerString = read $ TextL.unpack $ Aeson.encodeToLazyText
         (Cabal.Plan.pjCompilerId planJson)
   putStrErrLn $ "compiler: " ++ compilerString
-  let key = RootKey
-        { _rk_location = planFilePath
-        , _rk_compiler = Cabal.Plan.pjCompilerId planJson
-        , _rk_reason   = Build
-        }
-  let planUnits = extractPlansUnits [planJson]
-  let uids      = UnitId <$> planUnits
-  e <- addRegistryRoot key uids
+  e <- registerHelper [(planFilePath, planJson)]
   case e of
     Left err -> do
       putStrErrLn err
@@ -228,10 +222,57 @@ registerTask distNewstylePathM = do
     Right () -> pure ()
   putStrErrLn "successfully added to registry"
 
+reRegister :: [FilePath] -> IO (Either String ())
+reRegister planFilePaths = do
+  planJsons <- fmap join $ planFilePaths `forM` \planFilePath -> do
+    try (Cabal.Plan.decodePlanJson planFilePath) >>= \case
+      Left (err :: SomeException) -> do
+        putStrErrLn
+          $  "warning: could not parse "
+          ++ planFilePath
+          ++ ": "
+          ++ show err
+        pure []
+      Right x -> pure [(planFilePath, x)]
+  registerHelper planJsons
+
+registerHelper :: [(FilePath, Cabal.Plan.PlanJson)] -> IO (Either String ())
+registerHelper planJsons = do
+  tuples <- planJsons `forM` \(planFilePath, planJson) -> do
+    let key = RootKey
+          { _rk_location = planFilePath
+          , _rk_compiler = Cabal.Plan.pjCompilerId planJson
+          , _rk_reason   = Build
+          }
+    let planUnits = extractPlansUnits [planJson]
+    let uids      = UnitId <$> planUnits
+    pure (key, uids)
+  addRegistryRoots tuples
+
+
+registryRecheckPlansTask :: Bool -> IO ()
+registryRecheckPlansTask verbose = do
+  paths <- getRegistryPlanPaths >>= \case
+    Left err -> do
+      putStrErrLn err
+      System.Exit.exitFailure
+    Right x -> pure x
+  when verbose $ do
+    putStrErrLn "Re-registering roots from plans:"
+    paths `forM_` \p -> putStrErrLn $ "  " ++ p
+  e <- reRegister $ Set.toList paths
+  case e of
+    Left err -> do
+      putStrErrLn err
+      System.Exit.exitFailure
+    Right () -> pure ()
+
 
 storeGcTask
   :: [FilePath] -> [String] -> [String] -> [String] -> Bool -> Bool -> IO ()
 storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
+  putStrLn "Refreshing roots from registered plans"
+  registryRecheckPlansTask verbose
   ghcpkg <- case ghcpkgL of
     [x] -> pure x
     []  -> pure $ "ghc-pkg"

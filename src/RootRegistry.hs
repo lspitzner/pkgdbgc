@@ -2,6 +2,8 @@
 module RootRegistry
   ( getRegistryRoots
   , addRegistryRoot
+  , addRegistryRoots
+  , getRegistryPlanPaths
   , RootKey(..)
   , UnitId(..)
   , Reason(..)
@@ -14,6 +16,7 @@ import           Prelude
 
 import           Data.Map                      as Map
 import           Data.Set                      as Set
+import qualified Data.List                     as List
 import qualified Data.Text                     as Text
 import qualified System.Directory              as Directory
 import           Control.Monad.Trans.Except
@@ -34,7 +37,10 @@ import qualified Cabal.Plan
 
 
 
-data RootRegistry = RootRegistry (Map RootKey [UnitId])
+data RootRegistry = RootRegistry
+  { _rr_rootMap :: Map RootKey [UnitId]
+  , _rr_planPaths :: Set FilePath
+  }
   deriving Generic
 
 instance FromJSON RootRegistry where
@@ -84,7 +90,6 @@ instance ToJSON Reason where
   toJSON = Aeson.genericToJSON aesonDecodeOptions
   toEncoding = Aeson.genericToEncoding aesonDecodeOptions
 
-
 aesonDecodeOptions :: Aeson.Options
 aesonDecodeOptions = Aeson.defaultOptions
   { Aeson.omitNothingFields  = True
@@ -102,28 +107,53 @@ getRegistryRoots = runExceptT $ do
   loaded <- liftIO $ decodeFile filePath
   case loaded of
     Nothing -> throwE $ "could not decode registry file " ++ filePath
-    Just (RootRegistry registry) ->
+    Just registry ->
       pure
         $ Set.toList
         $ Set.fromList
-        $ [ unitId | descs <- Map.elems registry, UnitId unitId <- descs ]
+        $ [ unitId
+          | descs         <- Map.elems (_rr_rootMap registry)
+          , UnitId unitId <- descs
+          ]
 
 addRegistryRoot :: RootKey -> [UnitId] -> IO (Either String ())
-addRegistryRoot rootKey descrs = runExceptT $ do
+addRegistryRoot rootKey descrs = addRegistryRoots [(rootKey, descrs)]
+
+addRegistryRoots :: [(RootKey, [UnitId])] -> IO (Either String ())
+addRegistryRoots keyDescrss = runExceptT $ do
   userPathXdg <- liftIO
     $ Directory.getXdgDirectory Directory.XdgConfig "pkgdbgc"
   let filePath = userPathXdg </> "rootregister.yaml"
-  exists   <- liftIO $ Directory.doesFileExist filePath
-  registry <- if exists
+  exists                   <- liftIO $ Directory.doesFileExist filePath
+  registry :: RootRegistry <- if exists
     then do
       registryM <- liftIO $ decodeFile filePath
       case registryM of
         Nothing -> throwE $ "could not decode registry file " ++ filePath
-        Just (RootRegistry registry) -> pure registry
+        Just r  -> pure r
     else do
       liftIO $ Directory.createDirectoryIfMissing True userPathXdg
-      pure Map.empty
-  let registry' = Map.insert rootKey descrs registry
+      pure $ RootRegistry Map.empty Set.empty
+  let
+    registry' = List.foldl'
+      ( \r (rootKey, descrs) -> r
+        { _rr_rootMap   = Map.insert rootKey descrs (_rr_rootMap r)
+        , _rr_planPaths = Set.insert (_rk_location rootKey) (_rr_planPaths r)
+        }
+      )
+      registry
+      keyDescrss
   liftIO $ encodeFile filePath registry'
-  pure ()
+
+getRegistryPlanPaths :: IO (Either String (Set FilePath))
+getRegistryPlanPaths = runExceptT $ do
+  userPathXdg <- liftIO
+    $ Directory.getXdgDirectory Directory.XdgConfig "pkgdbgc"
+  let filePath = userPathXdg </> "rootregister.yaml"
+  exists <- liftIO $ Directory.doesFileExist filePath
+  unless exists $ throwE $ "registry file not found in " ++ filePath
+  loaded <- liftIO $ decodeFile filePath
+  case loaded of
+    Nothing       -> throwE $ "could not decode registry file " ++ filePath
+    Just registry -> pure $ _rr_planPaths registry
 
