@@ -271,8 +271,6 @@ registryRecheckPlansTask verbose = do
 storeGcTask
   :: [FilePath] -> [String] -> [String] -> [String] -> Bool -> Bool -> IO ()
 storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
-  putStrLn "Refreshing roots from registered plans"
-  registryRecheckPlansTask verbose
   ghcpkg <- case ghcpkgL of
     [x] -> pure x
     []  -> pure $ "ghc-pkg"
@@ -296,25 +294,27 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
         $  "Must specify exactly one specific compiler(s)"
         ++ " for which to run gc"
       System.Exit.exitFailure
+  storepath <- case storepathL of
+    [] -> do
+      home <- Directory.getHomeDirectory
+      pure $ home </> ".cabal" </> "store"
+    [p] -> pure p
+    _   -> do
+      putStrErrLn "More than one store path, aborting"
+      System.Exit.exitFailure
   pkgdir <- case dbPathL of
     [] -> do
-      storepath <- case storepathL of
-        [] -> do
-          home <- Directory.getHomeDirectory
-          pure $ home </> ".cabal" </> "store"
-        [p] -> pure p
-        _   -> do
-          putStrErrLn "More than one store path, aborting"
-          System.Exit.exitFailure
       pure $ storepath </> compiler </> "package.db"
-    [x]
-      | null storepathL -> pure x
-      | otherwise -> do
-        putStrErrLn "Cannot specify both --package-db and --store-path"
-        System.Exit.exitFailure
+    -- [x]
+    --   | null storepathL -> pure x
+    --   | otherwise -> do
+    --     putStrErrLn "Cannot specify both --package-db and --store-path"
+    --     System.Exit.exitFailure
     _ -> do
-      putStrErrLn "Must specify --package-db at most once"
+      putStrErrLn "Must not specify --package-db for store-gc (will be inferred from --store-path)"
       System.Exit.exitFailure
+  putStrLn "Refreshing roots from registered plans"
+  registryRecheckPlansTask verbose
   putStrTable "package-db directory" pkgdir
   exists <- Directory.doesDirectoryExist pkgdir
   unless exists $ do
@@ -369,4 +369,8 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
             putStr stdout
             putStr stderr
             System.Exit.exitFailure
+        let packageDirToDelete = storepath </> compiler </> uidStr
+        when verbose $ do
+          putStrErrLn $ "deleting directory `" ++ packageDirToDelete ++ "`"
+        Directory.removeDirectoryRecursive packageDirToDelete
 
