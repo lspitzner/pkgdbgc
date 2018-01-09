@@ -340,6 +340,9 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
   when (G.order restGraph /= length toBeDropped) $ do
     putStrErrLn "internal error: restGraph size /= toBeDropped length"
     System.Exit.exitFailure
+  when (null toBeDropped) $ do
+    putStrErrLn "All nodes reachable, nothing to gc"
+    System.Exit.exitSuccess
   putStrTable "count of entries to be dropped" (show $ length toBeDropped)
   if dry
     then do
@@ -349,7 +352,9 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
         toBeDropped `forM_` \x -> do
           putStrLn $ "  " ++ (show $ disp $ installedUnitId $ x)
     else do
+      putStrErr "Performing gc (this is slow atm)"
       toBeDropped `forM_` \uid -> do
+        unless verbose $ putStrErr "."
         let uidStr = show $ disp $ installedUnitId uid
         let args   = ["--package-db", pkgdir, "unregister", "--ipid", uidStr]
         when verbose $ do
@@ -373,4 +378,5 @@ storeGcTask storepathL ghcpkgL compilerL dbPathL dry verbose = do
         when verbose $ do
           putStrErrLn $ "deleting directory `" ++ packageDirToDelete ++ "`"
         Directory.removeDirectoryRecursive packageDirToDelete
+      unless verbose $ putStrErrLn ""
 
