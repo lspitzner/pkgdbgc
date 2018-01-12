@@ -26,7 +26,7 @@ executable pkgdbgc
                      , directory
                      , filepath
                      , ghc
-                     , butcher
+                     , butcher >= 1.3
                      , transformers
                      , containers
                      , pretty

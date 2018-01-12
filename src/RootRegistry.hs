@@ -101,7 +101,7 @@ getRegistryRoots :: IO (Either String [Cabal.UnitId])
 getRegistryRoots = runExceptT $ do
   userPathXdg <- liftIO
     $ Directory.getXdgDirectory Directory.XdgConfig "pkgdbgc"
-  let filePath = userPathXdg </> "rootregister.yaml"
+  let filePath = userPathXdg </> "rootregistry.yaml"
   exists <- liftIO $ Directory.doesFileExist filePath
   unless exists $ throwE $ "registry file not found in " ++ filePath
   loaded <- liftIO $ decodeFile filePath
@@ -123,7 +123,7 @@ addRegistryRoots :: [(RootKey, [UnitId])] -> IO (Either String ())
 addRegistryRoots keyDescrss = runExceptT $ do
   userPathXdg <- liftIO
     $ Directory.getXdgDirectory Directory.XdgConfig "pkgdbgc"
-  let filePath = userPathXdg </> "rootregister.yaml"
+  let filePath = userPathXdg </> "rootregistry.yaml"
   exists                   <- liftIO $ Directory.doesFileExist filePath
   registry :: RootRegistry <- if exists
     then do
@@ -149,7 +149,7 @@ getRegistryPlanPaths :: IO (Either String (Set FilePath))
 getRegistryPlanPaths = runExceptT $ do
   userPathXdg <- liftIO
     $ Directory.getXdgDirectory Directory.XdgConfig "pkgdbgc"
-  let filePath = userPathXdg </> "rootregister.yaml"
+  let filePath = userPathXdg </> "rootregistry.yaml"
   exists <- liftIO $ Directory.doesFileExist filePath
   unless exists $ throwE $ "registry file not found in " ++ filePath
   loaded <- liftIO $ decodeFile filePath
