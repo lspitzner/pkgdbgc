@@ -51,3 +51,7 @@ ARGUMENTS
                       path of ghc-pkg command to be used; this will also determine which package-db
                       in the store will be affected.
 ~~~~
+
+## Building
+
+- Currently requires HEAD of the butcher repository.
