@@ -205,7 +205,7 @@ registerTask distNewstylePathM = do
     Nothing -> do
       cwd <- liftIO $ Directory.getCurrentDirectory
       pure $ cwd </> "dist-newstyle" </> "cache" </> "plan.json"
-    Just x -> pure $ x </> "cache" </> "plan.json"
+    Just x -> Directory.makeAbsolute $ x </> "cache" </> "plan.json"
   exists <- liftIO $ Directory.doesFileExist planFilePath
   unless exists $ do
     putStrErrLn $ "could not find plan.json"
