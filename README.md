@@ -55,3 +55,9 @@ ARGUMENTS
 ## Building
 
 - Currently requires HEAD of the butcher repository.
+
+## Known Issues
+
+- Flags and build settings are currently not tracked. This means for example
+  that if you build with profiling, then without profiling, and then run the
+  gc, the profiling versions of dependencies are gc'ed.
