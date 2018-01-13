@@ -1,5 +1,27 @@
 # pkgdbgc
+
 garbage collection for haskell new-style global databases ("store")
+
+## Typical Basic Usage
+
+1. Register local dist-newstyle directories
+
+    ~~~~
+    find $HOME -name dist-newstyle -exec pkgdbgc register-dist-newstyle {} \;
+    ~~~~
+
+2. Run the gc that deletes all packages not reachable from those directories
+   (i.e. the current build configs in dist-newstyle dirs provide the roots
+   of the gc).
+   
+   ~~~~.sh
+   pkgdbgc store-gc
+   # or using specified ghc-pkg, to affect different ghc version package-db:
+   pkgdbgc --with-ghc-pkg=path/to/my/ghc-pkg store-gc
+   # Also consider the --dry-run --verbose flags to see what would be deleted
+   ~~~~
+
+## Detailed Usage
 
 ~~~~
 NAME
